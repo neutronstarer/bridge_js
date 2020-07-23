@@ -1,0 +1,63 @@
+{
+  "name": "bridge_js",
+  "version": "1.0.0",
+  "description": "bridge_js",
+  "scripts": {
+    "hub_dev": "npx webpack --mode development --entry './src/hub.js' --output-filename 'hub.js'",
+    "hub_pro": "npx webpack --mode production --entry './src/hub.js' --output-filename 'hub.min.js'",
+    "client_dev": "npx webpack --mode development --entry './src/client.js' --output-filename 'client.[hash].js'",
+    "client_pro": "npx webpack --mode production --entry './src/client.js' --output-filename 'client.[hash].min.js'",
+    "dev": "npx webpack --mode development --entry './src/hub.js' --output-filename 'hub.js' && npx webpack --mode development --entry './src/client.js' --output-filename 'client.[hash].js'",
+    "pro": "npx webpack --mode production --entry './src/hub.js' --output-filename 'hub.min.js' && npx webpack --mode production --entry './src/client.js' --output-filename 'client.[hash].min.js'"
+  },
+  "repository": {
+    "github": "https://github.com/neutronstarer/bridge_js.git"
+  },
+  "keywords": [],
+  "author": "neutronstarer",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.10.5",
+    "@babel/plugin-proposal-class-properties": "^7.10.4",
+    "@babel/preset-env": "^7.10.4",
+    "babel-eslint": "^10.1.0",
+    "babel-loader": "^8.1.0",
+    "eslint": "^7.5.0",
+    "eslint-config-standard": "^14.1.1",
+    "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1",
+    "webpack": "^4.43.0",
+    "webpack-cli": "^3.3.12"
+  },
+  "dependencies": {
+    "uuid": "^8.2.0",
+    "md5": "^2.2.1"
+  },
+  "babel": {
+    "presets": [
+      "@babel/preset-env"
+    ],
+    "plugins": [
+      "@babel/plugin-proposal-class-properties"
+    ]
+  },
+  "eslintIgnore": [
+    "dist/*"
+  ],
+  "eslintConfig": {
+    "parser": "babel-eslint",
+    "env": {
+      "browser": true,
+      "es2020": true
+    },
+    "extends": [
+      "standard"
+    ],
+    "parserOptions": {
+      "ecmaVersion": 11
+    },
+    "rules": {}
+  }
+}
