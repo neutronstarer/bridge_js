@@ -1,5 +1,4 @@
-;(function () {
-  const name = 'local.' + '<name>'
+;(function (name) {
   const hubKey = 'hub.' + name
   let hub = window[hubKey]
   if (hub != null) return hub
@@ -32,14 +31,14 @@
           }
         }
       } catch (e) {
-        const hash = require('./lib/md5')(name)
+        const hash = require('./vendor/md5')(name)
         return function (message) {
           // UIWebView WebView
           try {
             messages.push(JSON.stringify(message))
             const iframe = document.createElement('iframe')
             iframe.style.display = 'none'
-            iframe.src = 'https://' + hash + '/query'
+            iframe.src = 'https://bridge/' + hash + '/query'
             document.documentElement.appendChild(iframe)
             setTimeout(function () {
               document.documentElement.removeChild(iframe)
@@ -52,16 +51,17 @@
       }
     }
   })()
-  const winds = {}
+  const clients = {}
   const sendToClient = function (message) {
     const { to } = message
-    const wind = winds[to]
-    if (wind == null) {
-      return
+    const client = clients[to]
+    if (client == null) {
+      return false
     }
     const data = {}
     data[name] = message
-    wind.postMessage(data, '*')
+    client.postMessage(data, '*')
+    return true
   }
   // called by native
   hub.query = function () {
@@ -85,11 +85,11 @@
         throw new Error('from is null')
       }
       if (type === 'disconnect') {
-        delete winds[from]
+        delete clients[from]
       } else {
-        if (winds[from] == null) {
+        if (clients[from] == null) {
           if (type === 'connect') {
-            winds[from] = source
+            clients[from] = source
           } else {
             throw new Error('unknown window')
           }
@@ -101,7 +101,7 @@
     }
   })
   // hub did load
-  const hubDidLoad = function () {
+  const load = function () {
     // broadcast message to nested windows
     const broadcast = function (wd, message) {
       wd.postMessage(message, '*')
@@ -115,6 +115,6 @@
     data[name] = message
     broadcast(window, data)
   }
-  hubDidLoad()
+  load()
   return hub
-})()
+})('<name>')
