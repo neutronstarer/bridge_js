@@ -3,15 +3,21 @@
   "version": "1.0.0",
   "description": "js bridge between native and web",
   "scripts": {
-    "dev": "npx webpack --mode development --entry './src/hub.js' --output-filename 'hub.js' && npx webpack --mode development --entry './src/client.js' --output-filename 'client.[hash].js'",
-    "build": "npx webpack --mode production --entry './src/hub.js' --output-filename 'hub.min.js' && npx webpack --mode production --entry './src/client.js' --output-filename 'client.[hash].min.js'"
+    "build": "npx webpack --mode production --entry './src/client.js' --output-filename 'client.min.js' --output-libraryTarget 'umd' --output-umdNamedDefine true --output-library 'Client'",
+    "build_hub": "npx webpack --mode production --entry './src/hub.js' --output-filename 'hub.min.js'"
   },
   "repository": {
     "type": "git",
     "github": "git+https://github.com/neutronstarer/bridge_js.git"
   },
   "homepage": "https://github.com/neutronstarer/bridge_js.git",
-  "keywords": ["jsbridge", "ios", "android"],
+  "keywords": [
+    "webview",
+    "bridge",
+    "ios",
+    "android",
+    "macos"
+  ],
   "main": "src/client.js",
   "author": "neutronstarer",
   "license": "MIT",

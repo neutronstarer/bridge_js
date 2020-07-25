@@ -1,3 +1,4 @@
+
 ;(function (name) {
   const hubKey = 'hub.' + name
   let hub = window[hubKey]
@@ -31,14 +32,14 @@
           }
         }
       } catch (e) {
-        const hash = require('./vendor/md5')(name)
+        const md5 = require('./vendor/md5')(name)
         return function (message) {
           // UIWebView WebView
           try {
             messages.push(JSON.stringify(message))
             const iframe = document.createElement('iframe')
             iframe.style.display = 'none'
-            iframe.src = 'https://bridge/' + hash + '/query'
+            iframe.src = 'https://bridge/' + md5 + '/query'
             document.documentElement.appendChild(iframe)
             setTimeout(function () {
               document.documentElement.removeChild(iframe)
@@ -91,7 +92,7 @@
           if (type === 'connect') {
             clients[from] = source
           } else {
-            throw new Error('unknown window')
+            throw new Error('client does not exist')
           }
         }
       }

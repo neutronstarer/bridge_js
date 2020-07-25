@@ -1,14 +1,12 @@
-/* global define */
-; (function ($) {
+;(function () {
+  'use strict'
+
   const of = function (name) {
     const clientKey = 'client.' + name
     let client = window[clientKey]
     if (client != null) return client
     client = {}
     window[clientKey] = client
-    const messages = []
-    let hubLoaded = false
-    const clientId = require('./vendor/guid')()
     // create a message
     const createMessage = function (id, type, method, payload, error) {
       const message = {}
@@ -19,6 +17,9 @@
       if (error != null) message.error = error
       return message
     }
+    const messages = []
+    let hubLoaded = false
+    const clientId = require('./vendor/guid')()
     // send message
     const sendMessage = function (message, anyway = false) {
       message.from = clientId
@@ -44,7 +45,10 @@
     const completePromiseContextById = function (id, payload, error, automaticallyDelete = true) {
       const promiseContext = promiseContexts[id]
       if (promiseContext == null) {
-        return false
+        return
+      }
+      if (error === 'cancelled') {
+        sendMessage(createMessage(id, 'cancel', null, null, null))
       }
       if (promiseContext.timeout != null) {
         window.clearTimeout(promiseContext.timeout)
@@ -58,7 +62,6 @@
       if (automaticallyDelete === true) {
         delete promiseContexts[id]
       }
-      return true
     }
     // deliver
     client.deliver = function (method, payload) {
@@ -72,28 +75,35 @@
       })
       promise.setTimeout = function (timeout) {
         promiseContext.timeout = window.setTimeout(function () {
-          promiseContext.timeout = null
           completePromiseContextById(id, null, 'timed out')
         }, timeout)
         return this
       }
       promise.setCancelToken = function (cancelToken) {
         cancelToken.cancel = function () {
-          if (completePromiseContextById(id, null, 'cancelled') === false) {
-            return
-          }
-          sendMessage(createMessage(id, 'cancel', null, null, null))
+          completePromiseContextById(id, null, 'cancelled')
         }
         return this
       }
       return promise
     }
     const handlers = {}
-    client.on = function (method, event, cancel) {
-      handlers[method] = {
-        event: event,
-        cancel: cancel
+    client.on = function (method) {
+      let handler = handlers[method]
+      if (handler == null) {
+        handler = {
+          onEvent: function (onEvent) {
+            this.event = onEvent
+            return this
+          },
+          onCancel: function (onCancel) {
+            this.cancel = onCancel
+            return this
+          }
+        }
+        handlers[method] = handler
       }
+      return handler
     }
     const cancels = {}
     window.addEventListener('message', function ({ data, source }) {
@@ -123,34 +133,6 @@
           }
           return
         }
-        // emit
-        if (type === 'emit') {
-          const handler = handlers[method]
-          if (handler == null) {
-            return
-          }
-          handler.event(payload)
-          return
-        }
-        // deliver
-        if (type === 'deliver') {
-          const handler = handlers[method]
-          if (handler == null) {
-            sendMessage(createMessage(id, 'ack', null, null, 'unsupported method'))
-            return
-          }
-          const cancelContext = handler.event(payload, function (payload, error) {
-            sendMessage(createMessage(id, 'ack', null, payload, error))
-            delete cancels[id]
-          })
-          const cancel = handler.cancel
-          if (cancel != null) {
-            cancels[id] = function () {
-              cancel(cancelContext)
-              delete cancels[id]
-            }
-          }
-        }
         // ack
         if (type === 'ack') {
           completePromiseContextById(id, payload, error)
@@ -164,7 +146,45 @@
           }
           cancel()
         }
-      } catch (e) { }
+        const handler = handlers[method]
+        if (handler == null) {
+          return
+        }
+        // emit
+        if (type === 'emit') {
+          handler.event(payload)
+          sendMessage(createMessage(id, 'ack', null, null, 'unsupported method'))
+          return
+        }
+        let completed = false
+        const ack = function (payload, error) {
+          sendMessage(createMessage(id, 'ack', null, payload, error))
+        }
+        // deliver
+        if (type === 'deliver') {
+          const cancelContext = handler.event(payload, function (payload, error) {
+            if (completed === true) {
+              return
+            }
+            completed = true
+            ack(payload, error)
+            delete cancels[id]
+          })
+          const cancel = handler.cancel
+          if (cancel != null) {
+            cancels[id] = function () {
+              if (completed === true) {
+                return
+              }
+              completed = true
+              cancel(cancelContext)
+              delete cancels[id]
+            }
+          }
+        }
+      } catch (e) {
+        console.log(e)
+      }
     })
     const load = function () {
       const iframe = document.createElement('iframe')
@@ -177,6 +197,7 @@
     }
     const unload = function () {
       for (const id in promiseContexts) {
+        sendMessage(createMessage(id, 'cancel', null, null, null))
         completePromiseContextById(id, null, 'disconnected', false)
       }
       sendMessage(createMessage(null, 'disconnect'))
@@ -185,14 +206,7 @@
       unload()
     })
     load()
+    return client
   }
-  if (typeof define === 'function' && define.amd) {
-    define(function () {
-      return { of }
-    })
-  } else if (typeof module === 'object' && module.exports) {
-    module.exports = { of }
-  } else {
-    $.Client = { of }
-  }
-})(this)
+  module.exports = { of }
+})()
