@@ -1,9 +1,11 @@
 {
   "name": "@neutronstarer/bridgejs",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "js bridge between native and web",
+  "private": false,
+  "main": "src/index.js",
   "scripts": {
-    "build": "npx webpack --mode production --entry './src/client.js' --output-filename 'client.min.js' --output-libraryTarget 'umd' --output-umdNamedDefine true --output-library 'Client'",
+    "build": "npx webpack --mode production --entry './src/index.js' --output-filename 'index.min.js' --output-libraryTarget 'umd' --output-umdNamedDefine true --output-library 'Bridgejs'",
     "build_hub": "npx webpack --mode production --entry './src/hub.js' --output-filename 'hub.min.js'"
   },
   "repository": {
@@ -18,7 +20,6 @@
     "android",
     "macos"
   ],
-  "main": "src/client.js",
   "author": "neutronstarer",
   "license": "MIT",
   "devDependencies": {
@@ -33,7 +34,6 @@
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.2.1",
     "eslint-plugin-standard": "^4.0.1",
-    "ts-loader": "^8.0.1",
     "webpack": "^4.43.0",
     "webpack-cli": "^3.3.12"
   },

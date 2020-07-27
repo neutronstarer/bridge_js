@@ -1,6 +1,6 @@
 
 ;(function (name) {
-  const hubKey = 'hub.' + name
+  const hubKey = 'bridgejs_hub_' + name
   let hub = window[hubKey]
   if (hub != null) return hub
   hub = {}
@@ -32,14 +32,13 @@
           }
         }
       } catch (e) {
-        const md5 = require('./vendor/md5')(name)
         return function (message) {
           // UIWebView WebView
           try {
             messages.push(JSON.stringify(message))
             const iframe = document.createElement('iframe')
             iframe.style.display = 'none'
-            iframe.src = 'https://bridge/' + md5 + '/query'
+            iframe.src = 'https://bridgejs/query?name=' + encodeURIComponent(name)
             document.documentElement.appendChild(iframe)
             setTimeout(function () {
               document.documentElement.removeChild(iframe)
@@ -52,16 +51,16 @@
       }
     }
   })()
-  const clients = {}
-  const sendToClient = function (message) {
+  const bridges = {}
+  const sendToBridge = function (message) {
     const { to } = message
-    const client = clients[to]
-    if (client == null) {
+    const bridge = bridges[to]
+    if (bridge == null) {
       return false
     }
     const data = {}
     data[name] = message
-    client.postMessage(data, '*')
+    bridge.postMessage(data, '*')
     return true
   }
   // called by native
@@ -73,7 +72,7 @@
   // called by native
   hub.transmit = function (str) {
     const message = JSON.parse(str)
-    sendToClient(message)
+    sendToBridge(message)
   }
   window.addEventListener('message', function ({ source, data }) {
     try {
@@ -83,16 +82,16 @@
       }
       const { from = null, type = null } = message
       if (from == null) {
-        throw new Error('from is null')
+        throw new Error('from==null')
       }
       if (type === 'disconnect') {
-        delete clients[from]
+        delete bridges[from]
       } else {
-        if (clients[from] == null) {
+        if (bridges[from] == null) {
           if (type === 'connect') {
-            clients[from] = source
+            bridges[from] = source
           } else {
-            throw new Error('client does not exist')
+            throw new Error('bridge==null')
           }
         }
       }

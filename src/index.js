@@ -1,12 +1,11 @@
 ;(function () {
   'use strict'
-
   const of = function (name) {
-    const clientKey = 'client.' + name
-    let client = window[clientKey]
-    if (client != null) return client
-    client = {}
-    window[clientKey] = client
+    const bridgeKey = 'bridgejs_bridge_' + name
+    let bridge = window[bridgeKey]
+    if (bridge != null) return bridge
+    bridge = {}
+    window[bridgeKey] = bridge
     // create a message
     const createMessage = function (id, type, method, payload, error) {
       const message = {}
@@ -17,12 +16,19 @@
       if (error != null) message.error = error
       return message
     }
+    // bridge id, a guid
+    const bridgeId = (function () {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0; var v = c === 'x' ? r : (r & 0x3 | 0x8)
+        return v.toString(16)
+      })
+    }())
+    // messages cached before hud load
     const messages = []
     let hubLoaded = false
-    const clientId = require('./vendor/guid')()
     // send message
     const sendMessage = function (message, anyway = false) {
-      message.from = clientId
+      message.from = bridgeId
       if (anyway === false) {
         if (hubLoaded === false) {
           messages.push(message)
@@ -33,38 +39,40 @@
       data[name] = message
       window.top.postMessage(data, '*')
     }
-    // message id
+    // message seq id
     let _id = 0
     // emit
-    client.emit = function (method, payload) {
+    bridge.emit = function (method, payload) {
       sendMessage(createMessage(_id++, 'emit', method, payload, null))
     }
-    // deliver promiseContexts
+    // deliver promise context
     const promiseContexts = {}
     // complete promiseContext
+    // complete when bridge cancel , bridge unload, or server ack
     const completePromiseContextById = function (id, payload, error, automaticallyDelete = true) {
       const promiseContext = promiseContexts[id]
       if (promiseContext == null) {
         return
       }
-      if (error === 'cancelled') {
-        sendMessage(createMessage(id, 'cancel', null, null, null))
-      }
-      if (promiseContext.timeout != null) {
-        window.clearTimeout(promiseContext.timeout)
-        promiseContext.timeout = null
-      }
-      if (error != null) {
-        promiseContext.reject(error)
-      } else {
-        promiseContext.resolve(payload)
-      }
       if (automaticallyDelete === true) {
         delete promiseContexts[id]
       }
+      // should tell server to cancel
+      if (error === 'cancelled' || error === 'disconnected') {
+        sendMessage(createMessage(id, 'cancel', null, null, null))
+      }
+      if (promiseContext.timeoutContext != null) {
+        window.clearTimeout(promiseContext.timeoutContext)
+        promiseContext.timeout = null
+      }
+      if (error == null) {
+        promiseContext.resolve(payload)
+      } else {
+        promiseContext.reject(error)
+      }
     }
     // deliver
-    client.deliver = function (method, payload) {
+    bridge.deliver = function (method, payload) {
       const id = _id++
       sendMessage(createMessage(id, 'deliver', method, payload, null))
       const promiseContext = {}
@@ -74,7 +82,10 @@
         promiseContext.reject = reject
       })
       promise.setTimeout = function (timeout) {
-        promiseContext.timeout = window.setTimeout(function () {
+        if (promiseContext.timeoutContext != null) {
+          window.clearTimeout(promiseContext.timeoutContext)
+        }
+        promiseContext.timeoutContext = window.setTimeout(function () {
           completePromiseContextById(id, null, 'timed out')
         }, timeout)
         return this
@@ -88,16 +99,16 @@
       return promise
     }
     const handlers = {}
-    client.on = function (method) {
+    bridge.on = function (method) {
       let handler = handlers[method]
       if (handler == null) {
         handler = {
-          onEvent: function (onEvent) {
-            this.event = onEvent
+          event: function (event) {
+            this._event = event
             return this
           },
-          onCancel: function (onCancel) {
-            this.cancel = onCancel
+          cancel: function (cancel) {
+            this._cancel = cancel
             return this
           }
         }
@@ -120,12 +131,12 @@
               return
             }
             hubLoaded = true
-            // connect handler
             const handler = handlers.connect
             if (handler != null) {
-              handler.event(payload, function () {})
+              handler._event(payload, function () {})
             }
             sendMessage(createMessage(null, 'connect'))
+            // send cached messages
             messages.forEach(function (element) {
               sendMessage(element)
             })
@@ -146,40 +157,45 @@
           }
           cancel()
         }
-        const handler = handlers[method]
-        if (handler == null) {
-          return
-        }
         // emit
         if (type === 'emit') {
-          handler.event(payload)
-          sendMessage(createMessage(id, 'ack', null, null, 'unsupported method'))
+          const handler = handlers[method]
+          if (handler == null) {
+            return
+          }
+          handler._event(payload)
           return
-        }
-        let completed = false
-        const ack = function (payload, error) {
-          sendMessage(createMessage(id, 'ack', null, payload, error))
         }
         // deliver
         if (type === 'deliver') {
-          const cancelContext = handler.event(payload, function (payload, error) {
+          let completed = false
+          const ack = function (id, payload, error) {
+            sendMessage(createMessage(id, 'ack', null, payload, error))
+          }
+          const handler = handlers[method]
+          if (handler == null) {
+            ack(null, 'unsupported message')
+            return
+          }
+          const cancelContext = handler._event(payload, function (payload, error) {
             if (completed === true) {
               return
             }
             completed = true
-            ack(payload, error)
+            ack(id, payload, error)
             delete cancels[id]
           })
-          const cancel = handler.cancel
-          if (cancel != null) {
-            cancels[id] = function () {
-              if (completed === true) {
-                return
-              }
-              completed = true
-              cancel(cancelContext)
-              delete cancels[id]
+          const cancel = handler._cancel
+          if (cancel == null) {
+            return
+          }
+          cancels[id] = function () {
+            if (completed === true) {
+              return
             }
+            completed = true
+            cancel(cancelContext)
+            delete cancels[id]
           }
         }
       } catch (e) {
@@ -189,7 +205,7 @@
     const load = function () {
       const iframe = document.createElement('iframe')
       iframe.style.display = 'none'
-      iframe.src = 'https://bridge/' + require('./vendor/md5')(name) + '/load'
+      iframe.src = 'https://bridgejs/load?name=' + encodeURIComponent(name)
       document.documentElement.appendChild(iframe)
       setTimeout(function () {
         document.documentElement.removeChild(iframe)
@@ -206,7 +222,7 @@
       unload()
     })
     load()
-    return client
+    return bridge
   }
   module.exports = { of }
 })()
