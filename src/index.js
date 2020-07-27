@@ -174,7 +174,7 @@
           }
           const handler = handlers[method]
           if (handler == null) {
-            ack(null, 'unsupported message')
+            ack(null, 'unsupported method')
             return
           }
           const cancelContext = handler._event(payload, function (payload, error) {
