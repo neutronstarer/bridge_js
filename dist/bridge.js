@@ -63,7 +63,7 @@
       var promiseContexts = {}; // complete promiseContext
       // complete when bridge cancel , bridge unload, or server ack
 
-      var completePromiseContextById = function completePromiseContextById(id, res, error) {
+      var completePromiseContextById = function completePromiseContextById(id, ack, error) {
         var automaticallyDelete = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : true;
         var promiseContext = promiseContexts[id];
 
@@ -86,16 +86,16 @@
         }
 
         if (error == null) {
-          promiseContext.resolve(res);
+          promiseContext.resolve(ack);
         } else {
           promiseContext.reject(error);
         }
       }; // deliver
 
 
-      bridge.deliver = function (method, req) {
+      bridge.deliver = function (method, payload) {
         var id = _id++;
-        sendMessage(createMessage(id, 'deliver', method, req, null));
+        sendMessage(createMessage(id, 'deliver', method, payload, null));
         var promiseContext = {};
         promiseContexts[id] = promiseContext;
         var promise = new Promise(function (resolve, reject) {
@@ -228,24 +228,24 @@
           if (type === 'deliver') {
             var completed = false;
 
-            var ack = function ack(id, res, error) {
-              sendMessage(createMessage(id, 'ack', null, res, error));
+            var reply = function reply(id, ack, error) {
+              sendMessage(createMessage(id, 'ack', null, ack, error));
             };
 
             var _handler2 = handlers[method];
 
             if (_handler2 == null) {
-              ack(null, 'unsupported method');
+              reply(null, 'unsupported method');
               return;
             }
 
-            var cancelContext = _handler2.onEvent(payload, function (res, error) {
+            var cancelContext = _handler2.onEvent(payload, function (ack, error) {
               if (completed === true) {
                 return;
               }
 
               completed = true;
-              ack(id, res, error);
+              reply(id, ack, error);
               delete cancels[id];
             });
 
