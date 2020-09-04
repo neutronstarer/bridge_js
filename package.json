@@ -1,5 +1,5 @@
 {
-  "name": "@neutronstarer/bridge",
+  "name": "@neutronstarer/bridgejs",
   "version": "1.0.0",
   "description": "js bridge between native and web, component of bridge_os and bridge_android",
   "private": false,
