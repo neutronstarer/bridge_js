@@ -48,7 +48,7 @@ export default {of: function (name) {
   const promiseContexts = {}
   // complete promiseContext
   // complete when bridge cancel , bridge unload, or server ack
-  const completePromiseContextById = function (id, res, error, automaticallyDelete = true) {
+  const completePromiseContextById = function (id, ack, error, automaticallyDelete = true) {
     const promiseContext = promiseContexts[id]
     if (promiseContext == null) {
       return
@@ -65,15 +65,15 @@ export default {of: function (name) {
       promiseContext.timeoutContext = null
     }
     if (error == null) {
-      promiseContext.resolve(res)
+      promiseContext.resolve(ack)
     } else {
       promiseContext.reject(error)
     }
   }
   // deliver
-  bridge.deliver = function (method, req) {
+  bridge.deliver = function (method, payload) {
     const id = _id++
-    sendMessage(createMessage(id, 'deliver', method, req, null))
+    sendMessage(createMessage(id, 'deliver', method, payload, null))
     const promiseContext = {}
     promiseContexts[id] = promiseContext
     const promise = new Promise(function (resolve, reject) {
@@ -171,20 +171,20 @@ export default {of: function (name) {
       // deliver
       if (type === 'deliver') {
         let completed = false
-        const ack = function (id, res, error) {
-          sendMessage(createMessage(id, 'ack', null, res, error))
+        const reply = function (id, ack, error) {
+          sendMessage(createMessage(id, 'ack', null, ack, error))
         }
         const handler = handlers[method]
         if (handler == null) {
-          ack(null, 'unsupported method')
+          reply(null, 'unsupported method')
           return
         }
-        const cancelContext = handler.onEvent(payload, function (res, error) {
+        const cancelContext = handler.onEvent(payload, function (ack, error) {
           if (completed === true) {
             return
           }
           completed = true
-          ack(id, res, error)
+          reply(id, ack, error)
           delete cancels[id]
         })
         const cancel = handler.onCancel
